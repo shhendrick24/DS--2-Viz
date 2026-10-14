@@ -1,0 +1,469 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Who emits the most CO2?</title>
+  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@400;600;800&display=swap"
+    rel="stylesheet">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+  <style>
+    :root {
+      --bg: #EDF1F0;
+      --ink: #14212B;
+      --muted: #5B6B73;
+      --card: #FFFFFF;
+      --line: #C9D3D6;
+      --pick: #0F4C5C;
+      --on-pick: #FFFFFF;
+      --guess: #F2C14E;
+      --real: #D1495B;
+      box-sizing: border-box;
+      padding-top: env(safe-area-inset-top, 0px);
+      padding-bottom: env(safe-area-inset-bottom, 0px)
+    }
+
+    @media (prefers-color-scheme:dark) {
+      :root:not([data-theme="light"]) {
+        --bg: #0F1A20;
+        --ink: #E8EEF0;
+        --muted: #92A3AB;
+        --card: #18272F;
+        --line: #2C4048;
+        --pick: #5FB3C6;
+        --on-pick: #0F1A20
+      }
+    }
+
+    :root[data-theme="dark"] {
+      --bg: #0F1A20;
+      --ink: #E8EEF0;
+      --muted: #92A3AB;
+      --card: #18272F;
+      --line: #2C4048;
+      --pick: #5FB3C6;
+      --on-pick: #0F1A20
+    }
+
+    * {
+      box-sizing: border-box
+    }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--ink);
+      font-family: "Bricolage Grotesque", system-ui, sans-serif;
+      line-height: 1.5
+    }
+
+    main {
+      max-width: 760px;
+      margin: 0 auto;
+      padding: 28px 18px 60px
+    }
+
+    h1 {
+      font-size: clamp(28px, 6vw, 44px);
+      line-height: 1.05;
+      margin: 0 0 8px;
+      font-weight: 800
+    }
+
+    p {
+      margin: 0 0 14px;
+      color: var(--muted)
+    }
+
+    .step {
+      display: none
+    }
+
+    .step.on {
+      display: block
+    }
+
+    .chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin: 16px 0
+    }
+
+    .chip {
+      border: 1.5px solid var(--line);
+      background: var(--card);
+      color: var(--ink);
+      border-radius: 999px;
+      padding: 6px 13px;
+      font: inherit;
+      font-size: 14px;
+      cursor: pointer
+    }
+
+    .chip.sel {
+      background: var(--pick);
+      color: var(--on-pick);
+      border-color: var(--pick)
+    }
+
+    .chip:focus-visible,
+    button:focus-visible,
+    input:focus-visible {
+      outline: 3px solid var(--guess);
+      outline-offset: 2px
+    }
+
+    .go {
+      background: var(--ink);
+      color: var(--bg);
+      border: 0;
+      border-radius: 10px;
+      padding: 12px 22px;
+      font: inherit;
+      font-weight: 600;
+      font-size: 16px;
+      cursor: pointer
+    }
+
+    .go:disabled {
+      opacity: .35;
+      cursor: not-allowed
+    }
+
+    .big {
+      font-size: 72px;
+      font-weight: 800;
+      line-height: 1;
+      margin: 18px 0
+    }
+
+    input[type=range] {
+      width: 100%;
+      accent-color: var(--pick)
+    }
+
+    .wrap {
+      background: var(--card);
+      border-radius: 14px;
+      padding: 16px;
+      margin: 16px 0;
+      height: 300px;
+      position: relative
+    }
+
+    .score {
+      font-size: 56px;
+      font-weight: 800;
+      margin: 0
+    }
+
+    .ok {
+      color: var(--pick)
+    }
+
+    .no {
+      color: var(--real)
+    }
+
+    .tabs {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap
+    }
+
+    .fac {
+      height: 350px;
+      display: flex;
+      justify-content: space-around;
+      align-items: flex-end
+    }
+
+    .col {
+      width: 18%;
+      text-align: center;
+      color: var(--ink)
+    }
+
+    .lab {
+      font-weight: 800;
+      font-size: 18px;
+      height: 26px
+    }
+
+    .nm {
+      font-size: 13px;
+      color: var(--muted);
+      height: 20px
+    }
+
+    .plume {
+      position: relative;
+      width: 100%
+    }
+
+    .plume i {
+      position: absolute;
+      left: 24%;
+      bottom: 0;
+      margin-left: calc(var(--s)/-2);
+      width: var(--s);
+      height: var(--s);
+      border-radius: 50%;
+      background: var(--muted);
+      opacity: 0;
+      animation: rise 4s linear infinite;
+      animation-delay: var(--d)
+    }
+
+    @keyframes rise {
+      0% {
+        transform: translateY(0) scale(.5);
+        opacity: .7
+      }
+
+      100% {
+        transform: translateY(calc(var(--h) * -1 + var(--s))) scale(1.5);
+        opacity: 0
+      }
+    }
+
+    @media (prefers-reduced-motion:reduce) {
+      .plume i {
+        animation: none;
+        opacity: .3;
+        transform: translateY(calc(var(--h) * -.5))
+      }
+    }
+
+    .fab {
+      width: 100%;
+      display: block
+    }
+
+    .yr {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin: 8px 0 16px
+    }
+
+    .yr input {
+      flex: 1
+    }
+
+    .yr b {
+      font-size: 28px;
+      min-width: 64px;
+      text-align: right
+    }
+  </style>
+</head>
+
+<body>
+  <main>
+
+    <section class="step on" id="s1">
+      <h1>Who are the 5 biggest CO2 emitters?</h1>
+      <p>Pick 5 countries. Based on 2018 data.</p>
+      <div class="chips" id="chips"></div>
+      <button class="go" id="lock" disabled>Lock in picks</button> <span id="count"
+        style="margin-left:10px;color:var(--muted)">0 of 5</span>
+    </section>
+
+    <section class="step" id="s2">
+      <h1>How much of the world's CO2 do they make together?</h1>
+      <p>Drag to guess the combined share of global emissions from the top 5.</p>
+      <div class="big" id="val">50%</div>
+      <input type="range" id="slider" min="0" max="100" value="50" step="1" aria-label="Your guess in percent">
+      <p style="margin-top:20px"><button class="go" id="reveal">Reveal the answer</button></p>
+    </section>
+
+    <section class="step" id="s3">
+      <h1>Here's how you did</h1>
+      <p class="score" id="score"></p>
+      <p id="detail"></p>
+      <div class="wrap"><canvas id="chart"></canvas></div>
+      <button class="go" id="more">See the factories</button> <button class="chip" onclick="location.reload()">Play
+        again</button>
+    </section>
+
+    <section class="step" id="s4">
+      <h1>Same countries, different story</h1>
+      <p>Switch views to see how population changes the picture. Smoke height shows the value.</p>
+      <div class="tabs"><button class="chip sel" data-m="share">Total (% of world)</button><button class="chip"
+          data-m="pc">Per person (tonnes)</button></div>
+      <div class="wrap fac" id="fac"></div>
+      <h1 style="font-size:26px">The 2018 top 20, over time</h1>
+      <p>The same 20 countries every year, so you can watch them move.</p>
+      <div class="wrap" style="height:380px"><canvas id="scatter"></canvas></div>
+      <div class="yr"><button class="chip" id="play">Play</button><input type="range" id="yr" min="0" max="26"
+          value="26" aria-label="Year"><b id="yrv">2018</b></div>
+      <p id="note"></p>
+      <button class="go" onclick="show('s3')">Back to results</button>
+    </section>
+
+    <script>
+      // 1. THE DATA: one entry per country for 2018 (name, total CO2 in million tonnes, share of world %)
+      const data = [{"name": "Afghanistan", "total": 8.3, "share": 0.02, "pc": 0.22}, {"name": "Albania", "total": 4.7, "share": 0.01, "pc": 1.64}, {"name": "Algeria", "total": 161.5, "share": 0.44, "pc": 3.82}, {"name": "Angola", "total": 24.4, "share": 0.07, "pc": 0.79}, {"name": "Argentina", "total": 181.1, "share": 0.49, "pc": 4.08}, {"name": "Armenia", "total": 5.8, "share": 0.02, "pc": 1.97}, {"name": "Australia", "total": 416.0, "share": 1.14, "pc": 16.71}, {"name": "Austria", "total": 66.6, "share": 0.18, "pc": 7.49}, {"name": "Azerbaijan", "total": 36.8, "share": 0.1, "pc": 3.7}, {"name": "Bangladesh", "total": 82.6, "share": 0.23, "pc": 0.51}, {"name": "Belarus", "total": 61.0, "share": 0.17, "pc": 6.45}, {"name": "Belgium", "total": 100.2, "share": 0.27, "pc": 8.73}, {"name": "Bolivia", "total": 23.9, "share": 0.07, "pc": 2.1}, {"name": "Bosnia and Herzegovina", "total": 22.1, "share": 0.06, "pc": 6.64}, {"name": "Brazil", "total": 483.7, "share": 1.32, "pc": 2.31}, {"name": "Bulgaria", "total": 43.6, "share": 0.12, "pc": 6.19}, {"name": "Canada", "total": 579.5, "share": 1.58, "pc": 15.63}, {"name": "Chile", "total": 84.4, "share": 0.23, "pc": 4.51}, {"name": "China", "total": 10290.0, "share": 28.08, "pc": 7.21}, {"name": "Colombia", "total": 84.9, "share": 0.23, "pc": 1.71}, {"name": "Croatia", "total": 17.7, "share": 0.05, "pc": 4.26}, {"name": "Cuba", "total": 22.6, "share": 0.06, "pc": 1.99}, {"name": "Cyprus", "total": 7.3, "share": 0.02, "pc": 6.17}, {"name": "Czechia", "total": 106.1, "share": 0.29, "pc": 9.95}, {"name": "Denmark", "total": 34.7, "share": 0.09, "pc": 6.03}, {"name": "Ecuador", "total": 37.9, "share": 0.1, "pc": 2.22}, {"name": "Egypt", "total": 227.7, "share": 0.62, "pc": 2.31}, {"name": "Estonia", "total": 17.9, "share": 0.05, "pc": 13.56}, {"name": "Finland", "total": 45.8, "share": 0.13, "pc": 8.3}, {"name": "France", "total": 322.4, "share": 0.88, "pc": 4.96}, {"name": "Gabon", "total": 4.8, "share": 0.01, "pc": 2.25}, {"name": "Georgia", "total": 10.1, "share": 0.03, "pc": 2.52}, {"name": "Germany", "total": 754.1, "share": 2.06, "pc": 9.07}, {"name": "Greece", "total": 71.8, "share": 0.2, "pc": 6.82}, {"name": "Hungary", "total": 49.4, "share": 0.13, "pc": 5.09}, {"name": "Iceland", "total": 3.7, "share": 0.01, "pc": 10.88}, {"name": "India", "total": 2599.8, "share": 7.09, "pc": 1.92}, {"name": "Indonesia", "total": 614.9, "share": 1.68, "pc": 2.3}, {"name": "Iran", "total": 707.2, "share": 1.93, "pc": 8.64}, {"name": "Iraq", "total": 211.3, "share": 0.58, "pc": 5.5}, {"name": "Ireland", "total": 39.2, "share": 0.11, "pc": 8.13}, {"name": "Israel", "total": 60.5, "share": 0.17, "pc": 7.22}, {"name": "Italy", "total": 349.0, "share": 0.95, "pc": 5.76}, {"name": "Japan", "total": 1143.5, "share": 3.12, "pc": 8.99}, {"name": "Kazakhstan", "total": 317.3, "share": 0.87, "pc": 17.32}, {"name": "Kuwait", "total": 95.6, "share": 0.26, "pc": 23.1}, {"name": "Kyrgyzstan", "total": 11.7, "share": 0.03, "pc": 1.86}, {"name": "Latvia", "total": 7.9, "share": 0.02, "pc": 4.08}, {"name": "Libya", "total": 53.4, "share": 0.15, "pc": 7.99}, {"name": "Lithuania", "total": 13.7, "share": 0.04, "pc": 4.89}, {"name": "Luxembourg", "total": 9.6, "share": 0.03, "pc": 15.83}, {"name": "Malaysia", "total": 272.2, "share": 0.74, "pc": 8.63}, {"name": "Mexico", "total": 455.3, "share": 1.24, "pc": 3.61}, {"name": "Moldova", "total": 5.4, "share": 0.01, "pc": 1.34}, {"name": "Morocco", "total": 62.3, "share": 0.17, "pc": 1.73}, {"name": "Myanmar", "total": 32.7, "share": 0.09, "pc": 0.61}, {"name": "Netherlands", "total": 159.0, "share": 0.43, "pc": 9.32}, {"name": "New Zealand", "total": 35.8, "share": 0.1, "pc": 7.55}, {"name": "Nigeria", "total": 127.9, "share": 0.35, "pc": 0.65}, {"name": "North Macedonia", "total": 7.0, "share": 0.02, "pc": 3.37}, {"name": "Norway", "total": 44.5, "share": 0.12, "pc": 8.33}, {"name": "Oman", "total": 60.6, "share": 0.17, "pc": 12.55}, {"name": "Pakistan", "total": 238.3, "share": 0.65, "pc": 1.12}, {"name": "Peru", "total": 54.6, "share": 0.15, "pc": 1.71}, {"name": "Philippines", "total": 140.7, "share": 0.38, "pc": 1.32}, {"name": "Poland", "total": 337.0, "share": 0.92, "pc": 8.89}, {"name": "Portugal", "total": 51.5, "share": 0.14, "pc": 5.02}, {"name": "Qatar", "total": 106.9, "share": 0.29, "pc": 38.44}, {"name": "Romania", "total": 77.6, "share": 0.21, "pc": 3.98}, {"name": "Russia", "total": 1691.6, "share": 4.62, "pc": 11.61}, {"name": "Saudi Arabia", "total": 622.0, "share": 1.7, "pc": 18.45}, {"name": "Slovakia", "total": 36.0, "share": 0.1, "pc": 6.61}, {"name": "Slovenia", "total": 14.5, "share": 0.04, "pc": 6.98}, {"name": "South Africa", "total": 464.2, "share": 1.27, "pc": 8.03}, {"name": "South Korea", "total": 671.6, "share": 1.83, "pc": 13.13}, {"name": "Spain", "total": 269.7, "share": 0.74, "pc": 5.78}, {"name": "Sweden", "total": 42.1, "share": 0.11, "pc": 4.22}, {"name": "Switzerland", "total": 36.9, "share": 0.1, "pc": 4.32}, {"name": "Syria", "total": 30.4, "share": 0.08, "pc": 1.79}, {"name": "Tajikistan", "total": 9.1, "share": 0.02, "pc": 1.0}, {"name": "Tanzania", "total": 11.8, "share": 0.03, "pc": 0.21}, {"name": "Thailand", "total": 276.2, "share": 0.75, "pc": 3.98}, {"name": "Tunisia", "total": 29.4, "share": 0.08, "pc": 2.54}, {"name": "Turkey", "total": 419.4, "share": 1.14, "pc": 5.09}, {"name": "Ukraine", "total": 232.0, "share": 0.63, "pc": 5.24}, {"name": "United Arab Emirates", "total": 154.2, "share": 0.42, "pc": 16.01}, {"name": "United Kingdom", "total": 381.9, "share": 1.04, "pc": 5.69}, {"name": "United States", "total": 5375.5, "share": 14.67, "pc": 16.43}, {"name": "Uruguay", "total": 6.6, "share": 0.02, "pc": 1.91}, {"name": "Uzbekistan", "total": 114.7, "share": 0.31, "pc": 3.53}, {"name": "Venezuela", "total": 120.2, "share": 0.33, "pc": 4.16}, {"name": "Vietnam", "total": 223.7, "share": 0.61, "pc": 2.34}];
+
+      // HISTORY: the 2018 top 20, every year. c[country][yearIndex] = [total Mt, tonnes per person]
+      const hist = {"years": [1992, 1993, 1994, 1995, 1996, 1997, 1998, 1999, 2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010, 2011, 2012, 2013, 2014, 2015, 2016, 2017, 2018], "c": {"China": [[2730.8, 2.26], [2921.7, 2.4], [3100.0, 2.52], [3357.9, 2.71], [3503.2, 2.8], [3510.2, 2.78], [3360.5, 2.64], [3350.3, 2.61], [3439.2, 2.66], [3514.9, 2.71], [3872.6, 2.96], [4545.0, 3.46], [5223.8, 3.95], [5876.6, 4.42], [6488.8, 4.85], [6978.6, 5.18], [7496.8, 5.54], [7886.5, 5.79], [8616.7, 6.29], [9528.6, 6.92], [9775.6, 7.06], [9952.7, 7.15], [9985.6, 7.14], [9848.4, 7.0], [9720.4, 6.87], [9920.5, 6.98], [10290.0, 7.21]], "United States": [[5167.5, 20.11], [5267.3, 20.3], [5358.8, 20.43], [5421.5, 20.45], [5610.6, 20.91], [5686.5, 20.93], [5731.0, 20.83], [5804.7, 20.84], [6010.5, 21.34], [5904.9, 20.75], [5946.8, 20.7], [6011.8, 20.74], [6114.0, 20.91], [6134.5, 20.8], [6051.7, 20.32], [6131.0, 20.4], [5914.1, 19.49], [5478.2, 17.88], [5675.8, 18.37], [5540.2, 17.78], [5338.7, 17.0], [5474.3, 17.3], [5522.8, 17.33], [5371.8, 16.74], [5248.0, 16.25], [5207.8, 16.02], [5375.5, 16.43]], "India": [[656.0, 0.72], [677.9, 0.73], [716.9, 0.76], [762.1, 0.79], [825.9, 0.84], [859.7, 0.86], [877.7, 0.86], [951.7, 0.92], [978.9, 0.93], [992.6, 0.92], [1023.0, 0.94], [1059.6, 0.95], [1125.5, 1.0], [1186.0, 1.03], [1259.7, 1.08], [1358.2, 1.15], [1462.8, 1.22], [1612.8, 1.32], [1677.9, 1.36], [1780.1, 1.42], [1963.6, 1.55], [2036.9, 1.59], [2185.9, 1.69], [2268.6, 1.73], [2382.2, 1.8], [2433.9, 1.82], [2599.8, 1.92]], "Russia": [[1957.9, 13.2], [1859.7, 12.53], [1641.6, 11.07], [1613.1, 10.88], [1580.4, 10.68], [1475.4, 9.99], [1458.4, 9.9], [1486.3, 10.12], [1471.3, 10.05], [1507.7, 10.34], [1495.7, 10.3], [1525.6, 10.55], [1530.7, 10.62], [1547.6, 10.77], [1606.5, 11.2], [1604.5, 11.2], [1636.9, 11.43], [1529.0, 10.67], [1613.1, 11.24], [1665.2, 11.59], [1680.1, 11.67], [1619.4, 11.22], [1622.6, 11.22], [1623.1, 11.19], [1618.6, 11.14], [1646.5, 11.31], [1691.6, 11.61]], "Japan": [[1179.4, 9.41], [1172.3, 9.33], [1227.3, 9.74], [1239.6, 9.81], [1251.5, 9.88], [1244.8, 9.81], [1205.0, 9.48], [1241.6, 9.75], [1264.4, 9.91], [1249.8, 9.79], [1279.1, 10.0], [1287.5, 10.05], [1282.9, 10.01], [1290.4, 10.06], [1267.4, 9.87], [1303.1, 10.14], [1232.3, 9.59], [1163.2, 9.05], [1214.8, 9.45], [1264.9, 9.84], [1306.0, 10.17], [1315.3, 10.25], [1263.7, 9.86], [1223.4, 9.56], [1203.7, 9.42], [1188.1, 9.32], [1143.5, 8.99]], "Germany": [[965.9, 12.08], [956.1, 11.89], [939.8, 11.63], [939.0, 11.57], [959.2, 11.79], [931.3, 11.44], [923.4, 11.34], [895.9, 11.01], [899.9, 11.05], [916.6, 11.25], [900.0, 11.04], [901.2, 11.04], [887.1, 10.86], [866.7, 10.62], [878.3, 10.78], [851.6, 10.48], [854.9, 10.55], [790.3, 9.77], [832.9, 10.31], [809.2, 10.01], [814.0, 10.05], [831.5, 10.24], [792.6, 9.73], [795.6, 9.73], [800.7, 9.74], [785.9, 9.51], [754.1, 9.07]], "Iran": [[226.9, 3.86], [235.6, 3.94], [263.8, 4.35], [271.6, 4.42], [273.8, 4.39], [267.0, 4.23], [305.5, 4.78], [379.5, 5.86], [369.2, 5.63], [394.8, 5.94], [397.6, 5.91], [413.7, 6.07], [441.9, 6.41], [463.5, 6.64], [503.6, 7.14], [512.7, 7.19], [534.6, 7.41], [559.0, 7.67], [569.8, 7.72], [577.3, 7.74], [602.7, 7.98], [610.2, 7.98], [641.8, 8.29], [628.6, 8.01], [637.4, 8.01], [712.3, 8.83], [707.2, 8.64]], "South Korea": [[300.0, 6.84], [330.3, 7.45], [355.8, 7.94], [383.7, 8.47], [421.1, 9.2], [445.2, 9.64], [378.4, 8.12], [411.0, 8.74], [440.5, 9.3], [456.2, 9.56], [476.8, 9.93], [486.0, 10.07], [492.2, 10.15], [499.6, 10.26], [504.5, 10.32], [522.9, 10.66], [534.0, 10.86], [539.2, 10.93], [595.6, 12.02], [624.6, 12.54], [628.9, 12.56], [635.8, 12.63], [630.6, 12.46], [635.2, 12.5], [639.3, 12.54], [655.7, 12.83], [671.6, 13.13]], "Saudi Arabia": [[316.2, 18.29], [340.6, 19.18], [328.1, 18.02], [262.4, 14.08], [258.3, 13.57], [215.8, 11.12], [207.2, 10.48], [226.0, 11.19], [296.4, 14.34], [296.6, 13.99], [325.7, 14.94], [326.5, 14.54], [394.6, 17.06], [395.9, 16.62], [431.3, 17.6], [386.5, 15.35], [432.3, 16.7], [465.8, 17.49], [517.7, 18.88], [497.7, 17.61], [563.2, 19.32], [540.8, 18.0], [609.2, 19.7], [674.9, 21.28], [639.1, 19.7], [639.4, 19.32], [622.0, 18.45]], "Indonesia": [[203.6, 1.08], [219.8, 1.15], [222.9, 1.15], [226.5, 1.15], [255.1, 1.28], [280.7, 1.38], [216.0, 1.05], [244.0, 1.17], [274.7, 1.3], [303.3, 1.41], [310.8, 1.43], [340.4, 1.55], [344.4, 1.54], [349.0, 1.54], [346.7, 1.51], [388.3, 1.67], [366.3, 1.56], [402.0, 1.68], [451.9, 1.87], [504.8, 2.06], [521.5, 2.1], [496.1, 1.97], [499.0, 1.96], [551.5, 2.13], [560.8, 2.14], [575.2, 2.17], [614.9, 2.3]], "Canada": [[463.5, 16.42], [464.0, 16.25], [478.3, 16.57], [491.0, 16.83], [507.0, 17.21], [521.3, 17.53], [529.0, 17.62], [543.7, 17.94], [566.6, 18.52], [559.0, 18.1], [564.7, 18.11], [582.3, 18.49], [580.8, 18.25], [575.9, 17.9], [571.4, 17.56], [594.7, 18.06], [579.4, 17.38], [546.6, 16.2], [558.8, 16.36], [569.9, 16.5], [569.3, 16.3], [573.7, 16.25], [570.6, 16.0], [573.1, 15.91], [559.6, 15.38], [569.4, 15.5], [579.5, 15.63]], "Brazil": [[233.6, 1.51], [244.3, 1.56], [254.0, 1.59], [268.7, 1.66], [289.3, 1.76], [306.9, 1.84], [317.4, 1.87], [327.3, 1.9], [340.2, 1.95], [346.2, 1.95], [347.8, 1.94], [344.6, 1.9], [361.4, 1.96], [364.4, 1.96], [368.9, 1.96], [390.6, 2.05], [412.6, 2.15], [389.8, 2.01], [440.3, 2.25], [462.6, 2.34], [498.3, 2.5], [532.4, 2.65], [557.9, 2.75], [529.4, 2.59], [492.7, 2.39], [500.8, 2.41], [483.7, 2.31]], "South Africa": [[301.4, 7.79], [320.4, 8.08], [338.6, 8.35], [361.6, 8.73], [363.7, 8.61], [385.5, 8.97], [377.3, 8.64], [374.8, 8.45], [378.3, 8.41], [371.5, 8.15], [356.4, 7.72], [404.2, 8.65], [449.1, 9.5], [415.9, 8.69], [446.6, 9.21], [464.8, 9.46], [494.6, 9.94], [502.3, 9.95], [466.9, 9.12], [473.9, 9.11], [461.1, 8.73], [455.9, 8.49], [480.6, 8.81], [450.6, 8.14], [464.8, 8.27], [464.2, 8.14], [464.2, 8.03]], "Mexico": [[332.8, 3.82], [338.1, 3.81], [351.5, 3.9], [331.6, 3.62], [345.8, 3.71], [368.6, 3.9], [388.4, 4.04], [390.5, 4.01], [396.1, 4.0], [410.7, 4.09], [412.0, 4.05], [437.8, 4.25], [438.9, 4.2], [464.0, 4.38], [476.6, 4.43], [479.8, 4.39], [493.0, 4.45], [475.9, 4.23], [463.8, 4.06], [484.2, 4.18], [496.3, 4.23], [490.1, 4.12], [481.1, 4.0], [482.0, 3.96], [482.8, 3.91], [459.8, 3.69], [455.3, 3.61]], "Turkey": [[163.9, 2.94], [171.0, 3.02], [167.4, 2.91], [180.9, 3.09], [199.5, 3.36], [212.0, 3.51], [212.0, 3.46], [207.8, 3.34], [229.8, 3.63], [213.5, 3.33], [221.0, 3.39], [236.5, 3.58], [244.5, 3.65], [264.2, 3.89], [281.6, 4.1], [312.7, 4.49], [309.3, 4.39], [315.4, 4.42], [314.4, 4.35], [339.5, 4.62], [353.7, 4.74], [345.2, 4.55], [361.7, 4.68], [381.3, 4.86], [401.2, 5.03], [425.3, 5.24], [419.4, 5.09]], "Australia": [[286.3, 16.45], [291.3, 16.55], [300.1, 16.86], [308.0, 17.12], [316.3, 17.39], [327.1, 17.79], [338.7, 18.22], [346.6, 18.45], [351.8, 18.53], [360.5, 18.78], [367.1, 18.92], [373.2, 19.02], [386.8, 19.46], [387.6, 19.21], [397.3, 19.36], [401.9, 19.22], [409.7, 19.2], [401.3, 18.45], [404.5, 18.26], [405.3, 17.98], [402.7, 17.58], [393.2, 16.91], [399.3, 16.92], [403.3, 16.85], [415.9, 17.14], [414.8, 16.87], [416.0, 16.71]], "United Kingdom": [[592.9, 10.32], [578.6, 10.05], [574.6, 9.95], [566.6, 9.78], [588.2, 10.12], [562.3, 9.64], [567.6, 9.7], [561.1, 9.56], [567.6, 9.63], [576.3, 9.75], [560.1, 9.44], [571.5, 9.59], [572.9, 9.57], [570.0, 9.45], [567.6, 9.33], [559.2, 9.1], [544.5, 8.76], [493.9, 7.86], [511.6, 8.06], [469.5, 7.33], [487.5, 7.56], [477.4, 7.35], [438.5, 6.7], [422.3, 6.41], [399.3, 6.02], [387.6, 5.81], [381.9, 5.69]], "Italy": [[439.3, 7.69], [431.6, 7.55], [425.8, 7.44], [449.8, 7.87], [444.0, 7.78], [449.8, 7.9], [461.9, 8.14], [466.4, 8.23], [470.5, 8.3], [470.6, 8.27], [478.0, 8.36], [496.0, 8.62], [501.6, 8.66], [502.3, 8.62], [496.9, 8.49], [490.6, 8.35], [478.9, 8.13], [424.7, 7.19], [436.2, 7.35], [424.3, 7.12], [403.4, 6.74], [369.8, 6.15], [349.6, 5.79], [361.3, 5.96], [358.1, 5.9], [352.8, 5.82], [349.0, 5.76]], "Poland": [[364.7, 9.55], [365.4, 9.54], [360.5, 9.39], [362.9, 9.44], [377.6, 9.8], [367.5, 9.53], [339.3, 8.8], [329.5, 8.54], [317.7, 8.24], [313.8, 8.14], [306.6, 7.97], [319.6, 8.31], [324.4, 8.45], [323.4, 8.43], [337.3, 8.79], [336.7, 8.78], [330.5, 8.62], [316.8, 8.26], [334.9, 8.74], [334.3, 8.73], [326.7, 8.55], [322.6, 8.45], [310.3, 8.15], [313.4, 8.24], [324.3, 8.54], [337.7, 8.9], [337.0, 8.89]], "France": [[407.0, 7.12], [387.7, 6.76], [381.0, 6.62], [386.0, 6.68], [402.4, 6.94], [395.2, 6.79], [413.9, 7.08], [411.5, 7.01], [405.9, 6.88], [410.5, 6.91], [406.0, 6.79], [411.9, 6.84], [413.1, 6.81], [415.5, 6.8], [405.8, 6.6], [395.4, 6.39], [388.0, 6.24], [368.6, 5.89], [376.6, 5.99], [353.7, 5.6], [355.9, 5.6], [357.5, 5.6], [325.9, 5.08], [329.9, 5.12], [333.6, 5.16], [337.0, 5.2], [322.4, 4.96]]}};
+
+      // 2. THE ANSWER: sort biggest first, keep 5, add up their shares
+      const top5 = [...data].sort((a, b) => b.total - a.total).slice(0, 5);
+      const trueShare = top5.reduce((sum, c) => sum + c.share, 0);
+
+      // 3. GAME STATE: what the player has chosen so far
+      const picks = new Set();
+      const show = id => {document.querySelectorAll('.step').forEach(s => s.classList.remove('on')); document.getElementById(id).classList.add('on');};
+
+      // 4. STEP 1: build one button ("chip") per country, alphabetical
+      const chips = document.getElementById('chips'), lock = document.getElementById('lock'), count = document.getElementById('count');
+      [...data].sort((a, b) => a.name.localeCompare(b.name)).forEach(c => {
+        const b = document.createElement('button');
+        b.className = 'chip'; b.textContent = c.name;
+        b.onclick = () => {
+          if (picks.has(c.name)) picks.delete(c.name);
+          else if (picks.size < 5) picks.add(c.name);
+          b.classList.toggle('sel', picks.has(c.name));
+          count.textContent = picks.size + ' of 5';
+          lock.disabled = picks.size !== 5;
+        };
+        chips.appendChild(b);
+      });
+      lock.onclick = () => show('s2');
+
+      // 5. STEP 2: show the slider's value as you drag
+      const slider = document.getElementById('slider'), val = document.getElementById('val');
+      slider.oninput = () => val.textContent = slider.value + '%';
+
+      // 6. STEP 3: score it and draw the reveal chart
+      document.getElementById('reveal').onclick = () => {
+        const guess = +slider.value;
+        const hits = top5.filter(c => picks.has(c.name)).length;
+        const diff = Math.abs(guess - trueShare);
+        const off = Math.max(0, diff - 1); 
+        const points = hits * 10 + Math.max(0, Math.round(50 - off * 5)); // 50 pts for picks + 50 for the guess
+        document.getElementById('score').textContent = points + ' / 100';
+        document.getElementById('detail').innerHTML =
+          `You named <b>${hits} of 5</b> correctly (${top5.map(c => c.name).join(', ')}). ` +
+          `You guessed <b>${guess}%</b>; the real answer is <b>${trueShare.toFixed(1)}%</b>, so ${diff <= 1 ? 'that counts as spot on.' : 'you were off by ' + diff.toFixed(1) + ' points.'}`;
+        show('s3');
+
+        const css = getComputedStyle(document.documentElement);
+        const ink = css.getPropertyValue('--ink').trim(), line = css.getPropertyValue('--line').trim();
+        const colors = ['#0F4C5C', '#2A7F8E', '#5FB3C6', '#8FCBD8', '#BFE0E8'];
+        Chart.defaults.color = ink; Chart.defaults.font.family = '"Bricolage Grotesque", system-ui, sans-serif';
+        new Chart(document.getElementById('chart'), {
+          type: 'bar',
+          data: {
+            labels: ['Your guess', 'Actual'],
+            datasets: [
+              {label: 'Your guess', data: [guess, null], backgroundColor: css.getPropertyValue('--guess').trim()},
+              ...top5.map((c, i) => ({label: c.name, data: [null, c.share], backgroundColor: colors[i]}))
+            ]
+          },
+          options: {
+            indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+            scales: {
+              x: {stacked: true, max: 100, grid: {color: line}, title: {display: true, text: '% of world CO2 emissions'}},
+              y: {stacked: true, grid: {display: false}}
+            },
+            plugins: {legend: {position: 'bottom', labels: {boxWidth: 12}}}
+          }
+        });
+      };
+
+      // 7. FACTORIES: smoke height is proportional to the value for each of the top 5
+      const facEl = document.getElementById('fac');
+      function drawFactories(mode) {
+        const vals = top5.map(c => mode === 'share' ? c.share : c.pc);
+        const max = Math.max(...vals);
+        facEl.innerHTML = top5.map((c, i) => {
+          const h = 30 + vals[i] / max * 170;                 // plume height in px
+          const s = 14 + vals[i] / max * 14;                  // puff size in px
+          const puffs = Array.from({length: 10}, (_, k) => `<i style="--h:${h}px;--s:${s}px;--d:${k * 0.4}s"></i>`).join('');
+          const label = mode === 'share' ? vals[i].toFixed(1) + '%' : vals[i].toFixed(1) + ' t';
+          return `<div class="col"><div class="lab">${label}</div><div class="plume" style="height:${h}px">${puffs}</div>
+      <svg class="fab" viewBox="0 0 80 50"><rect x="4" y="22" width="72" height="26" fill="currentColor"/><rect x="14" y="4" width="10" height="20" fill="currentColor"/><rect x="40" y="12" width="8" height="12" fill="currentColor"/></svg>
+      <div class="nm">${c.name}</div></div>`;
+        }).join('');
+      }
+      document.querySelectorAll('.tabs .chip').forEach(b => b.onclick = () => {
+        document.querySelectorAll('.tabs .chip').forEach(x => x.classList.toggle('sel', x === b));
+        drawFactories(b.dataset.m);
+      });
+
+      // 8. SCATTER: top 20 by total; x = total emissions, y = tonnes per person; top 5 highlighted
+      let scatterDone = false;
+      document.getElementById('more').onclick = () => {
+        show('s4'); drawFactories('share');
+        const sorted = [...top5].sort((a, b) => a.pc - b.pc);
+        document.getElementById('note').textContent =
+          `Of the top 5, ${sorted[0].name} emits the least per person (${sorted[0].pc.toFixed(1)} t) and ${sorted[4].name} the most (${sorted[4].pc.toFixed(1)} t), even though ${top5[0].name} emits the most overall.`;
+        if (scatterDone) return; scatterDone = true;
+        const css = getComputedStyle(document.documentElement);
+        const ink = css.getPropertyValue('--ink').trim(), line = css.getPropertyValue('--line').trim();
+        const names = new Set(top5.map(c => c.name));
+        // points for one year (yi = index into the years list): one {x, y, name} per country
+        const ptsAt = yi => Object.entries(hist.c).map(([n, v]) => ({x: v[yi][0], y: v[yi][1], n}));
+        const all = Object.values(hist.c).flat();          // fixed axes across all years so movement is visible
+        const xmin = Math.min(...all.map(a => a[0])) * 0.8, xmax = Math.max(...all.map(a => a[0])) * 1.25, ymax = Math.max(...all.map(a => a[1])) * 1.1;
+        const last = hist.years.length - 1;
+        const labels = {
+          id: 'labels', afterDatasetsDraw(ch) {      // draws country names next to the top 5 dots
+            const ctx = ch.ctx; ctx.save(); ctx.fillStyle = ink; ctx.font = '12px "Bricolage Grotesque", sans-serif';
+            ch.getDatasetMeta(1).data.forEach((pt, i) => ctx.fillText(ch.data.datasets[1].data[i].n, pt.x + 9, pt.y + 4));
+            ctx.restore();
+          }
+        };
+        Chart.defaults.color = ink;
+        const chart = new Chart(document.getElementById('scatter'), {
+          type: 'scatter', plugins: [labels],
+          data: {
+            datasets: [
+              {label: 'Rest of top 20', data: ptsAt(last).filter(p => !names.has(p.n)), backgroundColor: '#5FB3C6', pointRadius: 6},
+              {label: 'Top 5', data: ptsAt(last).filter(p => names.has(p.n)), backgroundColor: css.getPropertyValue('--real').trim(), pointRadius: 9}]
+          },
+          options: {
+            responsive: true, maintainAspectRatio: false, animation: {duration: 250},
+            scales: {
+              x: {type: 'logarithmic', min: xmin, max: xmax, grid: {color: line}, title: {display: true, text: 'Total CO2 (million tonnes, log scale)'}},
+              y: {grid: {color: line}, title: {display: true, text: 'Tonnes of CO2 per person'}, beginAtZero: true, max: ymax}
+            },
+            plugins: {
+              legend: {position: 'bottom', labels: {boxWidth: 12}},
+              tooltip: {callbacks: {label: c => `${c.raw.n}: ${c.raw.x.toLocaleString()} Mt, ${c.raw.y.toFixed(1)} t per person`}}
+            }
+          }
+        });
+
+        // 9. YEAR SLIDER: swap in that year's points, then redraw the chart
+        const yr = document.getElementById('yr'), yrv = document.getElementById('yrv'), play = document.getElementById('play');
+        const setYear = yi => {
+          const pts = ptsAt(yi);
+          chart.data.datasets[0].data = pts.filter(p => !names.has(p.n));
+          chart.data.datasets[1].data = pts.filter(p => names.has(p.n));
+          yrv.textContent = hist.years[yi];
+          chart.update();
+        };
+        yr.oninput = () => {stop(); setYear(+yr.value);};
+        let timer = null;
+        const stop = () => {clearInterval(timer); timer = null; play.textContent = 'Play';};
+        play.onclick = () => {
+          if (timer) return stop();
+          if (+yr.value === last) yr.value = 0;              // restart from 1992 if already at the end
+          play.textContent = 'Pause';
+          timer = setInterval(() => {
+            yr.value = +yr.value + 1; setYear(+yr.value);
+            if (+yr.value === last) stop();
+          }, 450);
+        };
+      };
+    </script>
+  </main>
+</body>
+
+</html>
