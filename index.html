@@ -229,12 +229,10 @@
       }
     }
 
-    @media (prefers-reduced-motion:reduce) {
-      .plume i {
-        animation: none;
-        opacity: .3;
-        transform: translateY(calc(var(--h) * -.5))
-      }
+    .fac.still .plume i {
+      animation: none;
+      opacity: .35;
+      transform: translateY(calc(var(--h) * -1 * var(--k) / 10))
     }
 
     .fab {
@@ -275,6 +273,47 @@
       width: auto;
       vertical-align: -3px
     }
+
+    .ends {
+      display: flex;
+      justify-content: space-between;
+      color: var(--muted);
+      font-size: 14px;
+      margin-top: 2px
+    }
+
+    .big-btn {
+      font-size: 20px;
+      font-weight: 800;
+      padding: 16px 34px;
+      background: var(--pick);
+      color: var(--on-pick)
+    }
+
+    .bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap
+    }
+
+    .smoke {
+      border: 1.5px solid var(--ink);
+      background: transparent;
+      color: var(--ink);
+      border-radius: 999px;
+      padding: 6px 14px;
+      font: inherit;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer
+    }
+
+    .smoke:hover {
+      background: var(--ink);
+      color: var(--bg)
+    }
   </style>
 </head>
 
@@ -295,6 +334,7 @@
       <p>Drag to guess the combined share of global emissions from the top 5.</p>
       <div class="big" id="val">50%</div>
       <input type="range" id="slider" min="0" max="100" value="50" step="1" aria-label="Your guess in percent">
+      <div class="ends"><span>0%</span><span>100%</span></div>
       <p style="margin-top:20px"><button class="go" id="reveal">Reveal the answer</button></p>
     </section>
 
@@ -303,18 +343,24 @@
       <p class="score" id="score"></p>
       <p id="detail"></p>
       <div class="wrap"><canvas id="chart"></canvas></div>
-      <button class="go" id="more">See the factories</button> <button class="chip" onclick="location.reload()">Play
-        again</button>
+      <button class="go big-btn" id="more">Click to see more →</button> <button class="chip"
+        onclick="location.reload()">Play again</button>
     </section>
 
     <section class="step" id="s4">
       <h1>Same countries, different story</h1>
       <p>Switch views to see how population changes the picture. Smoke height shows the value.</p>
-      <div class="tabs"><button class="chip sel" data-m="share">Total (% of world)</button><button class="chip"
-          data-m="pc">Per person (tonnes)</button></div>
+      <div class="bar">
+        <div class="tabs"><button class="chip sel" data-m="share">Total (% of world)</button><button class="chip"
+            data-m="pc">Per person (tonnes)</button></div>
+        <button class="smoke" id="smoke">⏸ Pause smoke</button>
+      </div>
       <div class="wrap fac" id="fac"></div>
+      <p style="font-size:14px;margin:0 0 20px">Per person = a country's total CO2 emissions divided by its population
+        (tonnes of CO2 per person, per year).</p>
       <h1 style="font-size:26px">The 2018 top 20, over time</h1>
-      <p>The same 20 countries every year, so you can watch them move.</p>
+      <p>The same 20 countries every year, so you can watch them move. Dots further right emit more in total; dots
+        higher up emit more per person.</p>
       <div class="wrap" style="height:380px"><canvas id="scatter"></canvas></div>
       <div class="yr"><button class="chip" id="play">Play</button><input type="range" id="yr" min="0" max="26"
           value="26" aria-label="Year"><b id="yrv">2018</b></div>
@@ -412,7 +458,7 @@
         facEl.innerHTML = top5.map((c, i) => {
           const h = 30 + vals[i] / max * 170;                 // plume height in px
           const s = 14 + vals[i] / max * 14;                  // puff size in px
-          const puffs = Array.from({ length: 10 }, (_, k) => `<i style="--h:${h}px;--s:${s}px;--d:${k * 0.4}s"></i>`).join('');
+          const puffs = Array.from({ length: 10 }, (_, k) => `<i style="--h:${h}px;--s:${s}px;--k:${k};--d:${k * 0.4}s"></i>`).join('');
           const label = mode === 'share' ? vals[i].toFixed(1) + '%' : vals[i].toFixed(1) + ' t';
           return `<div class="col"><div class="lab">${label}</div><div class="plume" style="height:${h}px">${puffs}</div>
       <svg class="fab" viewBox="0 0 80 50"><rect x="4" y="22" width="72" height="26" fill="currentColor"/><rect x="14" y="4" width="10" height="20" fill="currentColor"/><rect x="40" y="12" width="8" height="12" fill="currentColor"/></svg>
@@ -423,6 +469,12 @@
         document.querySelectorAll('.tabs .chip').forEach(x => x.classList.toggle('sel', x === b));
         drawFactories(b.dataset.m);
       });
+
+      // Smoke animation switch. It starts off only if the computer is set to reduce motion.
+      const smokeBtn = document.getElementById('smoke');
+      const setSmoke = on => { facEl.classList.toggle('still', !on); smokeBtn.textContent = on ? '⏸ Pause smoke' : '▶ Play smoke'; };
+      setSmoke(!matchMedia('(prefers-reduced-motion: reduce)').matches);
+      smokeBtn.onclick = () => setSmoke(facEl.classList.contains('still'));
 
       // 8. SCATTER: top 20 by total; x = total emissions, y = tonnes per person; top 5 highlighted
       let scatterDone = false;
@@ -452,14 +504,14 @@
           type: 'scatter', plugins: [labels],
           data: {
             datasets: [
-              { label: 'Rest of top 20', data: ptsAt(last).filter(p => !names.has(p.n)), backgroundColor: '#5FB3C6', pointRadius: 6 },
+              { label: 'Rest of top 20', data: ptsAt(last).filter(p => !names.has(p.n)), backgroundColor: 'rgba(95,179,198,.5)', pointRadius: 5 },
               { label: 'Top 5', data: ptsAt(last).filter(p => names.has(p.n)), backgroundColor: css.getPropertyValue('--real').trim(), pointRadius: 9 }]
           },
           options: {
             responsive: true, maintainAspectRatio: false, animation: { duration: 250 },
             scales: {
-              x: { type: 'logarithmic', min: xmin, max: xmax, grid: { color: line }, title: { display: true, text: 'Total CO2 (million tonnes, log scale)' } },
-              y: { grid: { color: line }, title: { display: true, text: 'Tonnes of CO2 per person' }, beginAtZero: true, max: ymax }
+              x: { type: 'logarithmic', min: 100, max: 15000, grid: { display: false }, ticks: { callback: v => [100, 1000, 10000].includes(v) ? v.toLocaleString() : '' }, title: { display: true, text: 'Total emissions (million tonnes), each step is 10× bigger' } },
+              y: { grid: { color: line }, ticks: { stepSize: 5 }, title: { display: true, text: 'Tonnes of CO2 per person' }, beginAtZero: true, max: 25 }
             },
             plugins: {
               legend: { position: 'bottom', labels: { boxWidth: 12 } },
